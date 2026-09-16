@@ -367,6 +367,7 @@ export class LLMService {
           model,
           prompt,
           REMOTE_TIMEOUT_MS,
+          0.7,
         );
       case "lmstudio":
         return this.callOpenAICompatible(
@@ -375,6 +376,7 @@ export class LLMService {
           model,
           prompt,
           LOCAL_TIMEOUT_MS,
+          0.7,
         );
       case "ollama":
         return this.callOllama(
@@ -409,16 +411,19 @@ export class LLMService {
     model: string,
     prompt: string,
     timeoutMs: number,
+    temperature?: number,
   ): Promise<string> {
+    const body: Record<string, unknown> = {
+      model,
+      messages: [{ role: "user", content: prompt }],
+    };
+    if (temperature !== undefined) body.temperature = temperature;
+
     const response = await this.request(
       url,
       "POST",
       { "Content-Type": "application/json", ...headers },
-      {
-        model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-      },
+      body,
       timeoutMs,
     );
     return response.choices?.[0]?.message?.content?.trim() || "";

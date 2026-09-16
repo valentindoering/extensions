@@ -2,50 +2,24 @@ import {
   AI,
   Clipboard,
   environment,
+  getFrontmostApplication,
   getPreferenceValues,
   getSelectedText,
   launchCommand,
   LaunchType,
-  LocalStorage,
   showToast,
   Toast,
 } from "@raycast/api";
 
-import { execSync } from "child_process";
+import { getActionConfig } from "./action-config";
 import { LLMConfigError, LLMService } from "./llm-service";
+import { activateApplication, getSelectedTextViaClipboard } from "./selection";
 
-interface ActionConfig {
-  title: string;
-  prompt: string;
+interface ActionPreferences {
+  title?: string;
+  prompt?: string;
+  useClipboardSelectionFallback?: boolean;
 }
-
-const DEFAULT_CONFIGS: Record<string, ActionConfig> = {
-  "action-1": {
-    title: "Fix Grammar",
-    prompt:
-      "Fix all typos, spelling errors, and grammar issues in the following text. IMPORTANT: Do NOT change the capitalization of the first character - if it starts with a lowercase letter, keep it lowercase. Return only the corrected text without any explanation:",
-  },
-  "action-2": {
-    title: "Make Concise",
-    prompt:
-      "Make the following text more concise while preserving the key meaning. Return only the rewritten text without explanation:",
-  },
-  "action-3": {
-    title: "Create List",
-    prompt:
-      "Convert the following text into a clean bullet point list. Return only the list without explanation:",
-  },
-  "action-4": {
-    title: "Make Professional",
-    prompt:
-      "Rewrite the following text to be more professional and polished, suitable for business communication. Return only the rewritten text without explanation:",
-  },
-  "action-5": {
-    title: "Simplify",
-    prompt:
-      "Simplify the following text to make it easier to understand. Use simpler words and shorter sentences. Return only the simplified text without explanation:",
-  },
-};
 
 // In-memory lock to prevent concurrent executions
 let isRunning = false;
@@ -54,10 +28,7 @@ let isRunning = false;
 const lastRunTimes = new Map<string, number>();
 const DEBOUNCE_MS = 3000;
 
-export async function runStealthAction(
-  actionId: string,
-  forceEditor?: boolean,
-) {
+export async function runStealthAction(actionId: string) {
   const now = Date.now();
   console.log(`--- Starting runStealthAction: ${actionId} at ${now} ---`);
 
@@ -80,7 +51,7 @@ export async function runStealthAction(
   lastRunTimes.set(actionId, now);
 
   try {
-    await runStealthActionInternal(actionId, forceEditor);
+    await runStealthActionInternal(actionId);
   } finally {
     isRunning = false;
     console.log(`--- Finished runStealthAction: ${actionId} ---`);
@@ -106,101 +77,19 @@ async function showModelErrorToast(errorMsg: string) {
   return toast;
 }
 
-async function runStealthActionInternal(
-  actionId: string,
-  forceEditor?: boolean,
-) {
+async function runStealthActionInternal(actionId: string) {
   // 1. Load config
-  const prefs = getPreferenceValues();
-  let currentConfig: ActionConfig = {
-    title:
-      (prefs.title as string) || DEFAULT_CONFIGS[actionId]?.title || actionId,
-    prompt: (prefs.prompt as string) || DEFAULT_CONFIGS[actionId]?.prompt || "",
-  };
-
-  try {
-    const saved = await LocalStorage.getItem<string>("action-configs");
-    if (saved) {
-      const configs = JSON.parse(saved);
-      if (configs[actionId]) {
-        currentConfig = { ...currentConfig, ...configs[actionId] };
-      }
-    }
-  } catch (e) {
-    console.error("Failed to load configs", e);
-  }
+  const prefs = getPreferenceValues<ActionPreferences>();
+  const currentConfig = await getActionConfig(actionId, prefs);
   console.log(`Config: ${currentConfig.title}`);
 
   const isMac = process.platform === "darwin";
-
-  // Store original app info for re-activation (macOS only)
-  let frontApp = "";
-  let frontAppBundleId = "";
-
-  if (isMac) {
-    // macOS: Get the PREVIOUS frontmost app (not Raycast)
-    try {
-      const previousAppResult = execSync(
-        `osascript -e '
-          tell application "System Events"
-            set frontProc to first process whose frontmost is true
-            set frontName to name of frontProc
-            if frontName is "Raycast" then
-              set allProcs to every process whose visible is true and name is not "Raycast"
-              if (count of allProcs) > 0 then
-                set targetProc to item 1 of allProcs
-                return {name of targetProc, bundle identifier of targetProc}
-              else
-                return {"", ""}
-              end if
-            else
-              return {frontName, bundle identifier of frontProc}
-            end if
-          end tell
-        '`,
-      )
-        .toString()
-        .trim();
-
-      console.log(`[DEBUG] Previous app result: ${previousAppResult}`);
-
-      const match = previousAppResult.match(/^(.+?),\s*(.+)$/);
-      if (match) {
-        frontApp = match[1].trim();
-        frontAppBundleId = match[2].trim();
-      } else {
-        frontApp = previousAppResult;
-      }
-
-      console.log(`[DEBUG] Target app: ${frontApp} (${frontAppBundleId})`);
-
-      if (!frontApp || frontApp === "Raycast" || frontApp === "") {
-        const fallbackResult = execSync(
-          `osascript -e '
-            tell application "System Events"
-              set procList to name of every process whose visible is true and name is not "Raycast" and name is not "Finder"
-              if (count of procList) > 0 then
-                return item 1 of procList
-              else
-                return "Finder"
-              end if
-            end tell
-          '`,
-        )
-          .toString()
-          .trim();
-        frontApp = fallbackResult;
-        console.log(`[DEBUG] Fallback app: ${frontApp}`);
-      }
-    } catch (e) {
-      console.log(`[DEBUG] Could not get frontmost app: ${e}`);
-    }
-
-    if (frontApp === "Raycast") {
-      frontApp = "";
-      frontAppBundleId = "";
-    }
-  }
+  const targetApplication = isMac
+    ? await getFrontmostApplication().catch((error) => {
+        console.log(`[DEBUG] Could not get frontmost app: ${error}`);
+        return undefined;
+      })
+    : undefined;
 
   // 2. AI Access Debug (for troubleshooting "Model not supported")
   let canAccessAI = false;
@@ -216,25 +105,24 @@ async function runStealthActionInternal(
   let hasRealSelection = false;
 
   try {
-    if (!forceEditor) {
-      console.log("[DEBUG] Using Raycast getSelectedText API...");
-      selectedText = await getSelectedText();
-      console.log(
-        `[DEBUG] Got selected text: "${selectedText.substring(0, 50)}..." (${selectedText.length} chars)`,
-      );
-      hasRealSelection = selectedText.trim().length > 0;
-    }
+    console.log("[DEBUG] Using Raycast getSelectedText API...");
+    selectedText = await getSelectedText();
+    hasRealSelection = selectedText.trim().length > 0;
   } catch (e) {
     console.log(`[DEBUG] getSelectedText failed (no selection): ${e}`);
-    hasRealSelection = false;
   }
 
-  if (
-    forceEditor ||
-    !hasRealSelection ||
-    !selectedText ||
-    selectedText.trim().length === 0
-  ) {
+  if (!hasRealSelection && isMac && prefs.useClipboardSelectionFallback) {
+    try {
+      console.log("[DEBUG] Trying opt-in clipboard selection fallback...");
+      selectedText = await getSelectedTextViaClipboard(targetApplication);
+      hasRealSelection = selectedText.trim().length > 0;
+    } catch (error) {
+      console.log(`[DEBUG] Clipboard selection fallback failed: ${error}`);
+    }
+  }
+
+  if (!hasRealSelection || !selectedText || selectedText.trim().length === 0) {
     const toast = await showToast({
       style: Toast.Style.Failure,
       title: "No text selected",
@@ -308,28 +196,10 @@ async function runStealthActionInternal(
     console.log(`Pasting ${cleanResult.length} chars to replace selection`);
 
     if (isMac) {
-      // ... existing macOS logic ...
-      if (frontAppBundleId && frontAppBundleId !== "com.apple.finder") {
-        try {
-          execSync(
-            `osascript -e 'tell application id "${frontAppBundleId}" to activate'`,
-            { timeout: 5000 },
-          );
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        } catch (_e) {
-          // ignore activation errors
-        }
-      } else if (frontApp && frontApp !== "Finder") {
-        try {
-          const escapedAppName = frontApp.replace(/"/g, '\\"');
-          execSync(
-            `osascript -e 'tell application "${escapedAppName}" to activate'`,
-            { timeout: 5000 },
-          );
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        } catch (_e) {
-          // ignore activation errors
-        }
+      try {
+        await activateApplication(targetApplication);
+      } catch (error) {
+        console.log(`[DEBUG] Could not reactivate target app: ${error}`);
       }
     }
 

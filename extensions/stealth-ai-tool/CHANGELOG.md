@@ -1,5 +1,13 @@
 # Stealth AI Changelog
 
+## [Current OpenAI Models, Multiline Prompts & Selection Fallback] - {PR_MERGE_DATE}
+
+- Fix OpenAI requests for current GPT-5 models by omitting the unsupported hardcoded temperature
+- Add Configure Actions with a multiline prompt editor for all nine actions
+- Add an opt-in macOS clipboard selection fallback for apps where Raycast cannot read selected text
+- Preserve and restore the previous clipboard when the fallback runs
+- Replace shell-interpolated app activation with argument-safe AppleScript execution
+
 ## [Local Models: LM Studio & Ollama] - {PR_MERGE_DATE}
 
 - Add LM Studio and Ollama as providers, so prompts can run entirely on your own machine

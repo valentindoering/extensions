@@ -76,14 +76,29 @@ To make these actions truly "stealth", it is highly recommended to set up custom
 
 ### 3. Custom Prompts
 
-Each action's title and prompt are Raycast preferences:
+Run **Configure Actions** to edit every action's title and prompt. The prompt
+editor supports multiline text.
+
+Each action also keeps its existing Raycast preferences as a fallback for
+backward compatibility:
 
 - Open **Raycast Settings** > **Extensions** > **Stealth AI**
 - Pick the action and edit its **Action Title** and **AI Prompt**
 
 Actions 6-9 ship with empty prompts and are meant for your own.
 
-> Note: the in-app multiline prompt editor described in earlier versions is not currently implemented - prompts are single-line preference fields for now.
+Values saved through **Configure Actions** take precedence over the single-line
+preference fields.
+
+### 4. Selection Fallback on macOS
+
+Stealth AI uses Raycast's native selected-text API by default. If that API does
+not work in an app, enable **Use clipboard fallback for selected text** in the
+extension settings. The fallback temporarily uses `Cmd + C`, reads the selected
+text, and restores the previous clipboard before sending the prompt.
+
+The fallback is opt-in because it needs macOS Accessibility permission and
+temporarily touches the system clipboard.
 
 ## 🛠️ Included Actions
 

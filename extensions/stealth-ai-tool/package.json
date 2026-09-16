@@ -3,7 +3,7 @@
   "name": "stealth-ai-tool",
   "title": "Stealth AI",
   "description": "In-line AI formatting. Use Raycast AI, a cloud provider, or a local model via LM Studio or Ollama. Configure via the 'Configure AI Model' command, and set a custom Hotkey & Alias per action in Settings.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "icon": "icon.png",
   "author": "ahmed",
   "categories": [
@@ -21,12 +21,31 @@
     ]
   },
   "license": "MIT",
+  "preferences": [
+    {
+      "name": "useClipboardSelectionFallback",
+      "title": "Selection Fallback",
+      "description": "macOS only. If Raycast cannot read selected text, temporarily use Cmd+C and then restore the previous clipboard.",
+      "type": "checkbox",
+      "label": "Use clipboard fallback for selected text",
+      "default": false,
+      "required": false
+    }
+  ],
   "commands": [
     {
       "name": "configure-model",
       "title": "Configure AI Model",
       "subtitle": "Stealth AI",
       "description": "Choose a provider (cloud or local) and select a model",
+      "mode": "view",
+      "icon": "icon.png"
+    },
+    {
+      "name": "configure-actions",
+      "title": "Configure Actions",
+      "subtitle": "Stealth AI",
+      "description": "Edit action titles and multiline prompts",
       "mode": "view",
       "icon": "icon.png"
     },
@@ -56,7 +75,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "Default prompt (single-line). Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "Fix all typos, spelling errors, and grammar issues in the following text. Return only the corrected text without any explanation:",
           "required": false
@@ -89,7 +108,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "Default prompt (single-line). Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "Make the following text more concise while preserving the key meaning. Return only the rewritten text without explanation:",
           "required": false
@@ -122,7 +141,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "Default prompt (single-line). Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "Convert the following text into a clean bullet point list. Return only the list without explanation:",
           "required": false
@@ -155,7 +174,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "Default prompt (single-line). Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "Rewrite the following text to be more professional and polished, suitable for business communication. Return only the rewritten text without explanation:",
           "required": false
@@ -188,7 +207,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "Default prompt (single-line). Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "Simplify the following text to make it easier to understand. Use simpler words and shorter sentences. Return only the simplified text without explanation:",
           "required": false
@@ -215,7 +234,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "The prompt. Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "",
           "required": false
@@ -242,7 +261,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "The prompt. Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "",
           "required": false
@@ -269,7 +288,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "The prompt. Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "",
           "required": false
@@ -296,7 +315,7 @@
         {
           "name": "prompt",
           "title": "AI Prompt",
-          "description": "The prompt. Edit in the action view for multiline.",
+          "description": "Single-line fallback. Use Configure Actions for multiline prompts.",
           "type": "textfield",
           "default": "",
           "required": false
