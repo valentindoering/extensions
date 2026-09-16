@@ -34,13 +34,17 @@ Open **Raycast Settings** > **Extensions** > **Stealth AI** and set:
 
 - **AI Provider**
 - **API Key** for cloud providers
-- **Model** using the provider's exact model ID
 - **Local Server URL** for LM Studio or Ollama
 
-Raycast preference dropdowns are static, so the settings page cannot fetch a
-live model list. The model is therefore a text field. This keeps all
-configuration on the standard extension settings page and avoids a second
-configuration source.
+Then run **Select AI Model**. It fetches the current models from the configured
+provider and stores the selected model for that provider. If a new, private, or
+otherwise unlisted model is missing, choose **Enter Model ID Manually** from the
+action panel.
+
+Raycast preference dropdowns are static, so the extension settings page cannot
+fetch a live model list. The focused model picker is the only configuration
+outside Settings. Provider, API key, and local server URL still have one source
+of truth in Settings.
 
 | Provider | Needs API key | Notes |
 | --- | --- | --- |
@@ -60,12 +64,12 @@ Local providers keep your text on your own machine - nothing is sent to a cloud 
 
 1. Open LM Studio and go to the **Developer** tab.
 2. Toggle the server to **Running** (default port `1234`) and load a model.
-3. In Stealth AI settings, choose **LM Studio (Local)** and enter the loaded model's exact ID.
+3. In Stealth AI settings, choose **LM Studio (Local)**, then run **Select AI Model** and choose the loaded model.
 
 **Ollama**
 
 1. Make sure Ollama is running (`ollama serve`) and you have a model pulled, e.g. `ollama pull gemma3:1b`.
-2. In Stealth AI settings, choose **Ollama (Local)** and enter the pulled model's exact ID.
+2. In Stealth AI settings, choose **Ollama (Local)**, then run **Select AI Model** and choose the pulled model.
 
 Notes:
 

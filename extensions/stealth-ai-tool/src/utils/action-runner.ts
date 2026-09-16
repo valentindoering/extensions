@@ -4,6 +4,8 @@ import {
   environment,
   getFrontmostApplication,
   getPreferenceValues,
+  launchCommand,
+  LaunchType,
   openExtensionPreferences,
   showToast,
   Toast,
@@ -61,16 +63,26 @@ export async function runStealthAction(actionId: string) {
 }
 
 /** Surfaces a configuration problem with a one-press route to the fix. */
-async function showModelErrorToast(errorMsg: string) {
+async function showModelErrorToast(error: LLMConfigError) {
   const toast = await showToast({
     style: Toast.Style.Failure,
     title: "AI Not Configured",
-    message: errorMsg,
+    message: error.message,
   });
-  toast.primaryAction = {
-    title: "Open Extension Settings",
-    onAction: openExtensionPreferences,
-  };
+  toast.primaryAction =
+    error.destination === "model"
+      ? {
+          title: "Select AI Model",
+          onAction: () =>
+            launchCommand({
+              name: "select-model",
+              type: LaunchType.UserInitiated,
+            }),
+        }
+      : {
+          title: "Open Extension Settings",
+          onAction: openExtensionPreferences,
+        };
   return toast;
 }
 
@@ -146,12 +158,10 @@ async function runStealthActionInternal(actionId: string) {
     } catch (e) {
       console.error(`AI Service failed: ${e}`);
 
-      const errorMsg = (e as Error).message;
-
       // Misconfiguration (missing key/model, unreachable local server) gets a
       // toast that links straight to the configuration command.
       if (e instanceof LLMConfigError) {
-        await showModelErrorToast(errorMsg);
+        await showModelErrorToast(e);
         return;
       }
 
@@ -186,7 +196,7 @@ async function runStealthActionInternal(actionId: string) {
     console.error("Error:", error);
     const errorMsg = error instanceof Error ? error.message : String(error);
     if (error instanceof LLMConfigError) {
-      await showModelErrorToast(errorMsg);
+      await showModelErrorToast(error);
     } else {
       toast.style = Toast.Style.Failure;
       toast.title = "Failed";
