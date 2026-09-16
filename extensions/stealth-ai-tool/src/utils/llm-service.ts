@@ -1,12 +1,42 @@
-import { AI, getPreferenceValues } from "@raycast/api";
+import { AI, getPreferenceValues, LocalStorage } from "@raycast/api";
 import http from "http";
 import https from "https";
 
 interface AISettings {
   aiProvider?: string;
   aiApiKey?: string;
-  aiModel?: string;
   aiBaseUrl?: string;
+}
+
+export interface Model {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface ModelEntry {
+  id: string;
+  name?: string;
+  display_name?: string;
+}
+
+interface GeminiModel {
+  name: string;
+  displayName: string;
+}
+
+interface LMStudioModel {
+  id: string;
+  type?: string;
+  arch?: string;
+  quantization?: string;
+  state?: string;
+}
+
+interface OllamaModel {
+  name: string;
+  model?: string;
+  details?: { parameter_size?: string; quantization_level?: string };
 }
 
 const LOCAL_PROVIDERS = new Set(["lmstudio", "ollama"]);
@@ -39,7 +69,10 @@ export function defaultBaseUrl(provider: string): string {
  * to the extension settings.
  */
 export class LLMConfigError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly destination: "settings" | "model" = "settings",
+  ) {
     super(message);
     this.name = "LLMConfigError";
   }
@@ -79,13 +112,161 @@ export class LLMService {
     return getPreferenceValues<AISettings>().aiApiKey?.trim() || "";
   }
 
-  public static async getSelectedModel(): Promise<string> {
-    return getPreferenceValues<AISettings>().aiModel?.trim() || "";
+  public static async getSelectedModel(provider?: string): Promise<string> {
+    const activeProvider = provider ?? (await this.getProvider());
+    return (
+      (await LocalStorage.getItem<string>(
+        `selected_model_${activeProvider}`,
+      )) || ""
+    );
+  }
+
+  public static async setSelectedModel(
+    provider: string,
+    model: string,
+  ): Promise<void> {
+    await LocalStorage.setItem(`selected_model_${provider}`, model.trim());
   }
 
   public static async getBaseUrl(provider: string): Promise<string> {
     const configured = getPreferenceValues<AISettings>().aiBaseUrl || "";
     return normalizeBaseUrl(configured, provider);
+  }
+
+  // ---------------------------------------------------------------- models
+
+  public static async fetchModels(
+    provider: string,
+    key: string,
+    baseUrl?: string,
+  ): Promise<Model[]> {
+    const base = normalizeBaseUrl(baseUrl || "", provider);
+
+    if (provider === "openai") {
+      const response = await this.request(
+        "https://api.openai.com/v1/models",
+        "GET",
+        { Authorization: `Bearer ${key}` },
+      );
+      return response.data
+        .map((model: ModelEntry) => ({ id: model.id, name: model.id }))
+        .sort((a: Model, b: Model) => a.id.localeCompare(b.id));
+    }
+
+    if (provider === "anthropic") {
+      const response = await this.request(
+        "https://api.anthropic.com/v1/models",
+        "GET",
+        {
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+        },
+      );
+      return response.data
+        .map((model: ModelEntry) => ({
+          id: model.id,
+          name: model.display_name || model.id,
+        }))
+        .sort((a: Model, b: Model) => a.id.localeCompare(b.id));
+    }
+
+    if (provider === "gemini") {
+      const response = await this.request(
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        "GET",
+        { "x-goog-api-key": key },
+      );
+      return response.models
+        .filter((model: GeminiModel) => model.name.includes("gemini"))
+        .map((model: GeminiModel) => ({
+          id: model.name.replace("models/", ""),
+          name: model.displayName,
+        }));
+    }
+
+    if (provider === "openrouter") {
+      const response = await this.request(
+        "https://openrouter.ai/api/v1/models",
+        "GET",
+        {},
+      );
+      return response.data
+        .map((model: ModelEntry) => ({
+          id: model.id,
+          name: model.name || model.id,
+        }))
+        .sort((a: Model, b: Model) => a.id.localeCompare(b.id));
+    }
+
+    if (provider === "lmstudio") {
+      return this.fetchLMStudioModels(base, key);
+    }
+    if (provider === "ollama") return this.fetchOllamaModels(base, key);
+
+    return [];
+  }
+
+  private static async fetchLMStudioModels(
+    base: string,
+    key: string,
+  ): Promise<Model[]> {
+    const headers = this.localHeaders(key);
+    try {
+      const response = await this.request(
+        `${base}/api/v0/models`,
+        "GET",
+        headers,
+        null,
+        LOCAL_TIMEOUT_MS,
+      );
+      const entries: LMStudioModel[] = response.data || [];
+      return entries
+        .filter((model) => model.type !== "embeddings")
+        .map((model) => ({
+          id: model.id,
+          name: model.state === "loaded" ? `${model.id} (loaded)` : model.id,
+          description:
+            [model.arch, model.quantization].filter(Boolean).join(" · ") ||
+            undefined,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    } catch {
+      const response = await this.request(
+        `${base}/v1/models`,
+        "GET",
+        headers,
+        null,
+        LOCAL_TIMEOUT_MS,
+      );
+      const entries: ModelEntry[] = response.data || [];
+      return entries
+        .map((model) => ({ id: model.id, name: model.id }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    }
+  }
+
+  private static async fetchOllamaModels(
+    base: string,
+    key: string,
+  ): Promise<Model[]> {
+    const response = await this.request(
+      `${base}/api/tags`,
+      "GET",
+      this.localHeaders(key),
+      null,
+      LOCAL_TIMEOUT_MS,
+    );
+    const entries: OllamaModel[] = response.models || [];
+    return entries
+      .map((model) => ({
+        id: model.model || model.name,
+        name: model.name,
+        description:
+          [model.details?.parameter_size, model.details?.quantization_level]
+            .filter(Boolean)
+            .join(" · ") || undefined,
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id));
   }
 
   // ------------------------------------------------------------ completion
@@ -95,7 +276,7 @@ export class LLMService {
 
     if (provider === "raycast") return this.callRaycastAI(prompt);
 
-    const model = await this.getSelectedModel();
+    const model = await this.getSelectedModel(provider);
     const apiKey = await this.getApiKey();
 
     if (requiresApiKey(provider) && !apiKey) {
@@ -105,7 +286,8 @@ export class LLMService {
     }
     if (!model) {
       throw new LLMConfigError(
-        `No model selected for ${provider}. Set its exact model ID in the extension settings.`,
+        `No model selected for ${provider}. Run "Select AI Model".`,
+        "model",
       );
     }
 

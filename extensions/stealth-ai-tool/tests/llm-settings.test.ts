@@ -6,17 +6,23 @@ const manifest = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
 
-test("AI configuration lives in extension preferences", () => {
+test("credentials live in preferences and models use the dynamic picker", () => {
   const preferenceNames = manifest.preferences.map(
     (preference: { name: string }) => preference.name,
   );
 
-  assert.deepEqual(preferenceNames.slice(0, 4), [
+  assert.deepEqual(preferenceNames.slice(0, 3), [
     "aiProvider",
     "aiApiKey",
-    "aiModel",
     "aiBaseUrl",
   ]);
+  assert.equal(preferenceNames.includes("aiModel"), false);
+  assert.equal(
+    manifest.commands.some(
+      (command: { name: string }) => command.name === "select-model",
+    ),
+    true,
+  );
   assert.equal(
     manifest.commands.some(
       (command: { name: string }) => command.name === "configure-model",

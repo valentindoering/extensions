@@ -3,8 +3,8 @@
 ## [Settings Configuration, Current Models, Multiline Prompts & Text Workflows] - {PR_MERGE_DATE}
 
 - Fix OpenAI requests for current GPT-5 models by omitting the unsupported hardcoded temperature
-- Move provider, API key, model, and local server URL configuration to Raycast extension settings
-- Remove the separate Configure AI Model command and use a model ID text field because manifest dropdowns are static
+- Move provider, API key, and local server URL configuration to Raycast extension settings
+- Add a focused Select AI Model command that fetches the provider's current models, remembers one model per provider, and accepts manual IDs
 - Add Configure Actions with a multiline prompt editor for all nine actions
 - Add two exclusive text workflows: Raycast's native APIs or Script Command-style Cmd+C/Cmd+V
 - Replace shell-interpolated app activation with argument-safe AppleScript execution
