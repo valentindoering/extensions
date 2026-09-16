@@ -4,7 +4,7 @@
 
 - Fix OpenAI requests for current GPT-5 models by omitting the unsupported hardcoded temperature
 - Add Configure Actions with a multiline prompt editor for all nine actions
-- Add configurable Raycast-only, native-first, and clipboard-first selection methods on macOS
+- Add two exclusive text workflows: Raycast's native APIs or Script Command-style Cmd+C/Cmd+V
 - Preserve and restore the previous clipboard when the fallback runs
 - Replace shell-interpolated app activation with argument-safe AppleScript execution
 
