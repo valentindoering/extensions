@@ -4,6 +4,7 @@
 
 - Add two exclusive workflows: Raycast's native APIs or Script Command-style Cmd+C/Cmd+V.
 - Stop falling back between selected text and the existing clipboard.
+- Document that Paste in Frontmost App is required for one-step selected-text replacement.
 
 ## [Hyperlinks] - 2026-08-17
 

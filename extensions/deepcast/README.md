@@ -21,3 +21,13 @@ extension settings:
 The workflows are exclusive. Neither falls back to the other. The **Preferred
 Source** setting is also exclusive: choosing Selected does not use the existing
 clipboard when no text is selected.
+
+To translate and replace selected text in one step, use these extension
+settings together:
+
+- **Preferred Source:** Selected
+- **Text Selection and Replacement:** Raycast or Script-style Cmd+C / Cmd+V
+- **On Translation Action:** Paste in Frontmost App
+
+The Copy to Clipboard and View in Raycast actions do not replace the selected
+text.
