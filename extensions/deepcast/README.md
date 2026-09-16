@@ -8,17 +8,16 @@ Translate words, or entire sentences, into 30 different languages using DeepL.
 2. Go to https://www.deepl.com/pro-account/summary.
 3. Scroll down and get your API Token
 
-## Selected text compatibility on macOS
+## Text selection and replacement on macOS
 
-Deepcast can read selected text in three ways through **Selected Text Method**
-in the extension settings:
+Choose one complete workflow through **Text Selection and Replacement** in the
+extension settings:
 
-- **Raycast Only** uses Raycast's native selected-text API.
-- **Raycast, then Cmd+C** uses the native API first and the compatibility method
-  only when needed.
-- **Cmd+C, then Raycast** uses the compatibility method first and falls back to
-  the native API.
+- **Raycast (Default)** uses Raycast's native selected-text and paste APIs.
+- **Script-style Cmd+C / Cmd+V** clears the clipboard, copies the selection,
+  translates it, writes the translation to the clipboard, and pastes it over
+  the selection. This requires macOS Accessibility permission.
 
-The `Cmd+C` method preserves the previous clipboard and can retain rich text
-when the selected application provides it. It requires macOS Accessibility
-permission.
+The workflows are exclusive. Neither falls back to the other. The **Preferred
+Source** setting is also exclusive: choosing Selected does not use the existing
+clipboard when no text is selected.

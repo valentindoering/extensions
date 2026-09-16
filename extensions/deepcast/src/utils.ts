@@ -12,7 +12,7 @@ import {
 import got, { HTTPError, RequestError } from "got";
 import { StatusCodes, getReasonPhrase } from "http-status-codes";
 import { prepareTranslationPayload, toRichClipboardContent } from "./hyperlinks";
-import { getSelectedContent, getTargetApplication, SelectionMethod } from "./selection";
+import { getSelectedContent, getTargetApplication, replaceSelectedTextViaScript, SelectionMethod } from "./selection";
 
 const { returnToRootState } = getPreferenceValues<Preferences>();
 function isPro(key: string) {
@@ -72,9 +72,10 @@ function gotErrorToString(error: unknown) {
 }
 
 export async function getSelection(targetApplication?: Application) {
-  const method = getPreferenceValues<Preferences>().selectedTextMethod as SelectionMethod;
+  const configuredMethod = getPreferenceValues<Preferences>().selectedTextMethod;
+  const method: SelectionMethod = configuredMethod === "script" ? "script" : "raycast";
   const target = targetApplication ?? (await getTargetApplication());
-  return (await getSelectedContent(method ?? "raycast", target)).text;
+  return (await getSelectedContent(method, target)).text;
 }
 
 async function readClipboard() {
@@ -85,29 +86,21 @@ async function readClipboard() {
   }
 }
 
-// Get the text, matching preferences.
-// If selected text is the preferred source, it will try selected text but fallback to clipboard.
-// If clipboard is the preferred source, it will try clipboard but fallback to selected text.
-// Clipboard HTML is only used when clipboard text is the actual source, never by text matching.
 export async function readContent(targetApplication?: Application) {
   const preferences = getPreferenceValues<Preferences>();
-  const preferredSource = preferences.source;
-  const selectionMethod = (preferences.selectedTextMethod as SelectionMethod) ?? "raycast";
-  const clipboard = await readClipboard();
+  const selectionMethod: SelectionMethod = preferences.selectedTextMethod === "script" ? "script" : "raycast";
+
+  if (preferences.source === "clipboard") {
+    const clipboard = await readClipboard();
+    return {
+      text: clipboard.text ?? "",
+      html: clipboard.html,
+      workflow: "raycast" as SelectionMethod,
+    };
+  }
+
   const selected = await getSelectedContent(selectionMethod, targetApplication);
-
-  if (preferredSource === "clipboard") {
-    if (clipboard.text) {
-      return { text: clipboard.text, html: clipboard.html };
-    }
-    return selected;
-  }
-
-  if (selected.text) {
-    return selected;
-  }
-
-  return { text: clipboard.text || "", html: clipboard.html };
+  return { ...selected, workflow: selectionMethod };
 }
 
 export async function copyTranslatedText(translation: string, isHtml: boolean) {
@@ -118,7 +111,16 @@ export async function copyTranslatedText(translation: string, isHtml: boolean) {
   await Clipboard.copy(translation);
 }
 
-export async function pasteTranslatedText(translation: string, isHtml: boolean) {
+export async function pasteTranslatedText(
+  translation: string,
+  isHtml: boolean,
+  workflow: SelectionMethod = "raycast",
+  targetApplication?: Application,
+) {
+  if (workflow === "script") {
+    await replaceSelectedTextViaScript(translation, targetApplication);
+    return;
+  }
   if (isHtml) {
     await Clipboard.paste(toRichClipboardContent(translation));
     return;
@@ -145,9 +147,13 @@ export async function sendTranslateRequest({
     onTranslateAction ??= prefs.onTranslateAction;
     const targetApplication = await getTargetApplication();
 
-    const source: { text: string; html?: string } = initialText
-      ? { text: initialText }
+    const source = initialText
+      ? { text: initialText, workflow: "raycast" as SelectionMethod }
       : await readContent(targetApplication);
+    if (!source.text.trim()) {
+      await showToast(Toast.Style.Failure, "Please select the text to be translated");
+      return;
+    }
     const { text, isHtml } = prepareTranslationPayload(source.text, source.html);
 
     await showToast(Toast.Style.Animated, "Fetching translation...");
@@ -196,7 +202,7 @@ export async function sendTranslateRequest({
           break;
         case "paste":
           await closeMainWindow();
-          await pasteTranslatedText(translation, isHtml);
+          await pasteTranslatedText(translation, isHtml, source.workflow, targetApplication);
           break;
         default:
           await copyTranslatedText(translation, isHtml);

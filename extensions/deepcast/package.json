@@ -669,7 +669,7 @@
       "name": "source",
       "type": "dropdown",
       "title": "Preferred Source",
-      "description": "Choose a preferred text source. If no text is selected, clipboard is used.",
+      "description": "Choose the input source. Deepcast does not fall back to the other source.",
       "data": [
         {
           "title": "Selected",
@@ -686,20 +686,16 @@
     {
       "name": "selectedTextMethod",
       "type": "dropdown",
-      "title": "Selected Text Method",
-      "description": "Choose how Deepcast reads selected text. Cmd+C modes require macOS Accessibility permission.",
+      "title": "Text Selection and Replacement",
+      "description": "Use Raycast's native workflow or the macOS Cmd+C/Cmd+V workflow used by Script Commands.",
       "data": [
         {
-          "title": "Raycast Only",
+          "title": "Raycast (Default)",
           "value": "raycast"
         },
         {
-          "title": "Raycast, then Cmd+C",
-          "value": "fallback"
-        },
-        {
-          "title": "Cmd+C, then Raycast",
-          "value": "clipboard"
+          "title": "Script-style Cmd+C / Cmd+V",
+          "value": "script"
         }
       ],
       "default": "raycast",
@@ -815,6 +811,6 @@
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
     "publish": "npx @raycast/api@latest publish",
-    "test": "node --test tests/hyperlinks.test.ts"
+    "test": "node --test tests/*.test.ts"
   }
 }

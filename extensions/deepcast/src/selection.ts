@@ -1,24 +1,43 @@
-import { Application, Clipboard, getFrontmostApplication, getSelectedText } from "@raycast/api";
+import { Application, getFrontmostApplication, getSelectedText } from "@raycast/api";
 import { execFileSync } from "child_process";
+import { runTextWorkflow, TextWorkflow } from "./text-workflow";
 
-export type SelectionMethod = "raycast" | "fallback" | "clipboard";
+export type SelectionMethod = TextWorkflow;
 
 export interface SelectedContent {
   text: string;
   html?: string;
 }
 
+const UTF8_ENVIRONMENT = {
+  ...process.env,
+  LANG: "en_US.UTF-8",
+  LC_ALL: "en_US.UTF-8",
+};
+
 const ACTIVATE_AND_COPY_SCRIPT = `
 on run argv
   set targetBundleId to item 1 of argv
   tell application "System Events"
     if targetBundleId is not "" then
-      try
-        set frontmost of first application process whose bundle identifier is targetBundleId to true
-      end try
+      set frontmost of first application process whose bundle identifier is targetBundleId to true
     end if
     delay 0.1
     keystroke "c" using command down
+    delay 0.3
+  end tell
+end run
+`;
+
+const ACTIVATE_AND_PASTE_SCRIPT = `
+on run argv
+  set targetBundleId to item 1 of argv
+  tell application "System Events"
+    if targetBundleId is not "" then
+      set frontmost of first application process whose bundle identifier is targetBundleId to true
+    end if
+    delay 0.1
+    keystroke "v" using command down
   end tell
 end run
 `;
@@ -29,24 +48,19 @@ function runAppleScript(script: string, args: string[] = []): void {
   });
 }
 
-async function readClipboard(): Promise<Awaited<ReturnType<typeof Clipboard.read>>> {
-  try {
-    return await Clipboard.read();
-  } catch {
-    return { text: (await Clipboard.readText()) ?? "" };
-  }
+function writeClipboardText(text: string): void {
+  execFileSync("/usr/bin/pbcopy", [], {
+    input: text,
+    encoding: "utf8",
+    env: UTF8_ENVIRONMENT,
+  });
 }
 
-async function restoreClipboard(content: Awaited<ReturnType<typeof Clipboard.read>>): Promise<void> {
-  if (content.file) {
-    await Clipboard.copy({ file: content.file });
-  } else if (content.html) {
-    await Clipboard.copy({ html: content.html, text: content.text });
-  } else if (content.text !== undefined) {
-    await Clipboard.copy(content.text);
-  } else {
-    await Clipboard.clear();
-  }
+function readClipboardText(): string {
+  return execFileSync("/usr/bin/pbpaste", ["-Prefer", "txt"], {
+    encoding: "utf8",
+    env: UTF8_ENVIRONMENT,
+  });
 }
 
 async function getViaRaycast(): Promise<SelectedContent> {
@@ -58,21 +72,16 @@ async function getViaRaycast(): Promise<SelectedContent> {
   }
 }
 
-async function getViaClipboard(targetApplication?: Application): Promise<SelectedContent> {
+async function getViaScript(targetApplication?: Application): Promise<SelectedContent> {
   if (process.platform !== "darwin") return { text: "" };
 
-  const previousClipboard = await readClipboard();
   try {
-    await Clipboard.clear();
+    writeClipboardText("");
     runAppleScript(ACTIVATE_AND_COPY_SCRIPT, [targetApplication?.bundleId ?? ""]);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const selected = await readClipboard();
-    return { text: selected.text ?? "", html: selected.html };
+    return { text: readClipboardText() };
   } catch (error) {
-    console.log(`Cmd+C selected-text method failed: ${error}`);
+    console.log(`Script selected-text workflow failed: ${error}`);
     return { text: "" };
-  } finally {
-    await restoreClipboard(previousClipboard);
   }
 }
 
@@ -91,13 +100,13 @@ export async function getSelectedContent(
   method: SelectionMethod,
   targetApplication?: Application,
 ): Promise<SelectedContent> {
-  if (method === "raycast") return getViaRaycast();
+  return runTextWorkflow(method, {
+    raycast: getViaRaycast,
+    script: () => getViaScript(targetApplication),
+  });
+}
 
-  if (method === "clipboard") {
-    const copied = await getViaClipboard(targetApplication);
-    return copied.text ? copied : getViaRaycast();
-  }
-
-  const selected = await getViaRaycast();
-  return selected.text ? selected : getViaClipboard(targetApplication);
+export async function replaceSelectedTextViaScript(text: string, targetApplication?: Application): Promise<void> {
+  writeClipboardText(text);
+  runAppleScript(ACTIVATE_AND_PASTE_SCRIPT, [targetApplication?.bundleId ?? ""]);
 }

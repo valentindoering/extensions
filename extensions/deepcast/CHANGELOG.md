@@ -1,9 +1,9 @@
 # Deepcast Changelog
 
-## [Selected Text Compatibility] - {PR_MERGE_DATE}
+## [Text Selection and Replacement] - {PR_MERGE_DATE}
 
-- Add Raycast-only, native-first, and clipboard-first selected-text methods on macOS.
-- Preserve the previous clipboard when using the Cmd+C compatibility method.
+- Add two exclusive workflows: Raycast's native APIs or Script Command-style Cmd+C/Cmd+V.
+- Stop falling back between selected text and the existing clipboard.
 
 ## [Hyperlinks] - 2026-08-17
 
