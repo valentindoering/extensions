@@ -4,8 +4,7 @@ import {
   environment,
   getFrontmostApplication,
   getPreferenceValues,
-  launchCommand,
-  LaunchType,
+  openExtensionPreferences,
   showToast,
   Toast,
 } from "@raycast/api";
@@ -69,13 +68,8 @@ async function showModelErrorToast(errorMsg: string) {
     message: errorMsg,
   });
   toast.primaryAction = {
-    title: "Configure AI Model",
-    onAction: () => {
-      launchCommand({
-        name: "configure-model",
-        type: LaunchType.UserInitiated,
-      });
-    },
+    title: "Open Extension Settings",
+    onAction: openExtensionPreferences,
   };
   return toast;
 }
@@ -120,13 +114,8 @@ async function runStealthActionInternal(actionId: string) {
       message: "Please select text first",
     });
     toast.primaryAction = {
-      title: "Configure AI Model",
-      onAction: () => {
-        launchCommand({
-          name: "configure-model",
-          type: LaunchType.UserInitiated,
-        });
-      },
+      title: "Open Extension Settings",
+      onAction: openExtensionPreferences,
     };
     return;
   }

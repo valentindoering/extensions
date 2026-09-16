@@ -1,11 +1,12 @@
 # Stealth AI Changelog
 
-## [Current OpenAI Models, Multiline Prompts & Selection Fallback] - {PR_MERGE_DATE}
+## [Settings Configuration, Current Models, Multiline Prompts & Text Workflows] - {PR_MERGE_DATE}
 
 - Fix OpenAI requests for current GPT-5 models by omitting the unsupported hardcoded temperature
+- Move provider, API key, model, and local server URL configuration to Raycast extension settings
+- Remove the separate Configure AI Model command and use a model ID text field because manifest dropdowns are static
 - Add Configure Actions with a multiline prompt editor for all nine actions
 - Add two exclusive text workflows: Raycast's native APIs or Script Command-style Cmd+C/Cmd+V
-- Preserve and restore the previous clipboard when the fallback runs
 - Replace shell-interpolated app activation with argument-safe AppleScript execution
 
 ## [Local Models: LM Studio & Ollama] - {PR_MERGE_DATE}
@@ -17,7 +18,7 @@
 - Ollama model list shows parameter size and quantization
 - HTTP endpoints are now supported (previously every request was forced through HTTPS)
 - All requests now time out instead of hanging: 60s for cloud providers, 180s for local ones
-- Clearer failures: unreachable server, missing key and missing model each explain the fix and link to "Configure AI Model"
+- Clearer failures: unreachable server, missing key and missing model each explain the fix and link to extension settings
 - Anthropic responses are no longer truncated at 1024 tokens
 - Gemini API key moved out of the request URL into a header
 - Fix model dropdown breaking when a saved model is missing from the fetched list
