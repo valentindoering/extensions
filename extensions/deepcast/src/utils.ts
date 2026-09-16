@@ -1,5 +1,5 @@
 import {
-  getSelectedText,
+  Application,
   Clipboard,
   Toast,
   showToast,
@@ -12,6 +12,7 @@ import {
 import got, { HTTPError, RequestError } from "got";
 import { StatusCodes, getReasonPhrase } from "http-status-codes";
 import { prepareTranslationPayload, toRichClipboardContent } from "./hyperlinks";
+import { getSelectedContent, getTargetApplication, SelectionMethod } from "./selection";
 
 const { returnToRootState } = getPreferenceValues<Preferences>();
 function isPro(key: string) {
@@ -70,12 +71,10 @@ function gotErrorToString(error: unknown) {
   return "Unknown error";
 }
 
-export async function getSelection() {
-  try {
-    return await getSelectedText();
-  } catch {
-    return "";
-  }
+export async function getSelection(targetApplication?: Application) {
+  const method = getPreferenceValues<Preferences>().selectedTextMethod as SelectionMethod;
+  const target = targetApplication ?? (await getTargetApplication());
+  return (await getSelectedContent(method ?? "raycast", target)).text;
 }
 
 async function readClipboard() {
@@ -90,20 +89,22 @@ async function readClipboard() {
 // If selected text is the preferred source, it will try selected text but fallback to clipboard.
 // If clipboard is the preferred source, it will try clipboard but fallback to selected text.
 // Clipboard HTML is only used when clipboard text is the actual source, never by text matching.
-export async function readContent() {
-  const preferredSource = getPreferenceValues<Preferences>().source;
+export async function readContent(targetApplication?: Application) {
+  const preferences = getPreferenceValues<Preferences>();
+  const preferredSource = preferences.source;
+  const selectionMethod = (preferences.selectedTextMethod as SelectionMethod) ?? "raycast";
   const clipboard = await readClipboard();
-  const selected = await getSelection();
+  const selected = await getSelectedContent(selectionMethod, targetApplication);
 
   if (preferredSource === "clipboard") {
     if (clipboard.text) {
       return { text: clipboard.text, html: clipboard.html };
     }
-    return { text: selected || "" };
+    return selected;
   }
 
-  if (selected) {
-    return { text: selected };
+  if (selected.text) {
+    return selected;
   }
 
   return { text: clipboard.text || "", html: clipboard.html };
@@ -142,8 +143,11 @@ export async function sendTranslateRequest({
     const prefs = getPreferenceValues<Preferences>();
     const { key, closeRaycastAfterTranslation } = prefs;
     onTranslateAction ??= prefs.onTranslateAction;
+    const targetApplication = await getTargetApplication();
 
-    const source: { text: string; html?: string } = initialText ? { text: initialText } : await readContent();
+    const source: { text: string; html?: string } = initialText
+      ? { text: initialText }
+      : await readContent(targetApplication);
     const { text, isHtml } = prepareTranslationPayload(source.text, source.html);
 
     await showToast(Toast.Style.Animated, "Fetching translation...");

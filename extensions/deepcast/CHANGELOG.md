@@ -1,5 +1,10 @@
 # Deepcast Changelog
 
+## [Selected Text Compatibility] - {PR_MERGE_DATE}
+
+- Add Raycast-only, native-first, and clipboard-first selected-text methods on macOS.
+- Preserve the previous clipboard when using the Cmd+C compatibility method.
+
 ## [Hyperlinks] - 2026-08-17
 
 - Preserve original HTML formatting and hyperlinks when translating copied rich text, then copy the result as rich text so it can be pasted back with ⌘V.

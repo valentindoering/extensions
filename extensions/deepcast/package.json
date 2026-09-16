@@ -684,6 +684,28 @@
       "required": false
     },
     {
+      "name": "selectedTextMethod",
+      "type": "dropdown",
+      "title": "Selected Text Method",
+      "description": "Choose how Deepcast reads selected text. Cmd+C modes require macOS Accessibility permission.",
+      "data": [
+        {
+          "title": "Raycast Only",
+          "value": "raycast"
+        },
+        {
+          "title": "Raycast, then Cmd+C",
+          "value": "fallback"
+        },
+        {
+          "title": "Cmd+C, then Raycast",
+          "value": "clipboard"
+        }
+      ],
+      "default": "raycast",
+      "required": true
+    },
+    {
       "description": "Action on translation",
       "name": "onTranslateAction",
       "required": false,
