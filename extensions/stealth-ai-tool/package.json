@@ -24,21 +24,17 @@
   "preferences": [
     {
       "name": "selectionMethod",
-      "title": "Selected Text Method",
-      "description": "Choose how Stealth AI reads selected text before replacing it. Cmd+C modes require macOS Accessibility permission.",
+      "title": "Text Selection and Replacement",
+      "description": "Use Raycast's native workflow or the macOS Cmd+C/Cmd+V workflow used by Script Commands.",
       "type": "dropdown",
       "data": [
         {
-          "title": "Raycast Only",
+          "title": "Raycast (Default)",
           "value": "raycast"
         },
         {
-          "title": "Raycast, then Cmd+C",
-          "value": "fallback"
-        },
-        {
-          "title": "Cmd+C, then Raycast",
-          "value": "clipboard"
+          "title": "Script-style Cmd+C / Cmd+V",
+          "value": "script"
         }
       ],
       "default": "raycast",
@@ -354,6 +350,7 @@
     "dev": "ray dev",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
-    "publish": "npx @raycast/api@latest publish"
+    "publish": "npx @raycast/api@latest publish",
+    "test": "node --test tests/text-workflow.test.ts"
   }
 }

@@ -13,8 +13,8 @@ import {
 import { getActionConfig } from "./action-config";
 import { LLMConfigError, LLMService } from "./llm-service";
 import {
-  activateApplication,
   getSelectedTextWithMethod,
+  replaceSelectedTextWithMethod,
   SelectionMethod,
 } from "./selection";
 
@@ -104,8 +104,9 @@ async function runStealthActionInternal(actionId: string) {
   }
 
   // 3. Get selected text using Raycast's native cross-platform API
-  const selectionMethod = prefs.selectionMethod ?? "raycast";
-  console.log(`[DEBUG] Selected-text method: ${selectionMethod}`);
+  const selectionMethod: SelectionMethod =
+    prefs.selectionMethod === "script" ? "script" : "raycast";
+  console.log(`[DEBUG] Text workflow: ${selectionMethod}`);
   const selectedText = await getSelectedTextWithMethod(
     selectionMethod,
     targetApplication,
@@ -185,15 +186,11 @@ async function runStealthActionInternal(actionId: string) {
     toast.title = "Inserting...";
     console.log(`Pasting ${cleanResult.length} chars to replace selection`);
 
-    if (isMac) {
-      try {
-        await activateApplication(targetApplication);
-      } catch (error) {
-        console.log(`[DEBUG] Could not reactivate target app: ${error}`);
-      }
-    }
-
-    await Clipboard.paste(cleanResult);
+    await replaceSelectedTextWithMethod(
+      selectionMethod,
+      cleanResult,
+      targetApplication,
+    );
     toast.style = Toast.Style.Success;
     toast.title = "Done!";
   } catch (error) {
