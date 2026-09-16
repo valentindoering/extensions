@@ -1,102 +1,42 @@
-import { AI, LocalStorage } from "@raycast/api";
+import { AI, getPreferenceValues } from "@raycast/api";
 import http from "http";
 import https from "https";
 
-export interface Model {
-  id: string;
-  name: string;
-  description?: string;
+interface AISettings {
+  aiProvider?: string;
+  aiApiKey?: string;
+  aiModel?: string;
+  aiBaseUrl?: string;
 }
 
-export interface ProviderInfo {
-  value: string;
-  title: string;
-  /** Local providers talk to a server on the user's own machine. */
-  local: boolean;
-  /** Whether an API key must be supplied before the provider can be used. */
-  requiresApiKey: boolean;
-  /** Default endpoint for local providers, editable by the user. */
-  defaultBaseUrl?: string;
-  docsUrl: string;
-  hint?: string;
-}
-
-export const PROVIDERS: ProviderInfo[] = [
-  {
-    value: "raycast",
-    title: "Raycast AI (Default)",
-    local: false,
-    requiresApiKey: false,
-    docsUrl: "https://raycast.com",
-  },
-  {
-    value: "openai",
-    title: "OpenAI",
-    local: false,
-    requiresApiKey: true,
-    docsUrl: "https://platform.openai.com/docs/models",
-  },
-  {
-    value: "anthropic",
-    title: "Anthropic",
-    local: false,
-    requiresApiKey: true,
-    docsUrl: "https://docs.anthropic.com/en/docs/about-claude/models",
-  },
-  {
-    value: "gemini",
-    title: "Gemini",
-    local: false,
-    requiresApiKey: true,
-    docsUrl: "https://ai.google.dev/gemini-api/docs/models/gemini",
-  },
-  {
-    value: "openrouter",
-    title: "OpenRouter",
-    local: false,
-    requiresApiKey: true,
-    docsUrl: "https://openrouter.ai/models",
-  },
-  {
-    value: "lmstudio",
-    title: "LM Studio (Local)",
-    local: true,
-    requiresApiKey: false,
-    defaultBaseUrl: "http://localhost:1234",
-    docsUrl: "https://lmstudio.ai/docs/app/api/endpoints/rest",
-    hint: "Start the server in LM Studio: Developer tab -> Status: Running (default port 1234).",
-  },
-  {
-    value: "ollama",
-    title: "Ollama (Local)",
-    local: true,
-    requiresApiKey: false,
-    defaultBaseUrl: "http://localhost:11434",
-    docsUrl: "https://github.com/ollama/ollama/blob/main/docs/api.md",
-    hint: "Make sure Ollama is running (`ollama serve`) and you have pulled at least one model.",
-  },
-];
-
-export function getProviderInfo(provider: string): ProviderInfo | undefined {
-  return PROVIDERS.find((p) => p.value === provider);
-}
+const LOCAL_PROVIDERS = new Set(["lmstudio", "ollama"]);
+const API_KEY_PROVIDERS = new Set([
+  "openai",
+  "anthropic",
+  "gemini",
+  "openrouter",
+]);
+const DEFAULT_BASE_URLS: Record<string, string> = {
+  lmstudio: "http://localhost:1234",
+  ollama: "http://localhost:11434",
+};
 
 export function isLocalProvider(provider: string): boolean {
-  return getProviderInfo(provider)?.local ?? false;
+  return LOCAL_PROVIDERS.has(provider);
 }
 
 export function requiresApiKey(provider: string): boolean {
-  return getProviderInfo(provider)?.requiresApiKey ?? false;
+  return API_KEY_PROVIDERS.has(provider);
 }
 
 export function defaultBaseUrl(provider: string): string {
-  return getProviderInfo(provider)?.defaultBaseUrl ?? "";
+  return DEFAULT_BASE_URLS[provider] ?? "";
 }
 
 /**
  * Raised when the extension is misconfigured (missing key/model, unreachable
  * local server). The action runner turns these into a toast that links straight
- * to the "Configure AI Model" command.
+ * to the extension settings.
  */
 export class LLMConfigError extends Error {
   constructor(message: string) {
@@ -105,44 +45,10 @@ export class LLMConfigError extends Error {
   }
 }
 
-export const STORAGE_KEYS = {
-  provider: "configured_provider",
-  apiKey: (p: string) => `api_key_${p}`,
-  model: (p: string) => `selected_model_${p}`,
-  baseUrl: (p: string) => `base_url_${p}`,
-};
-
 /** Remote calls get a short leash; local models may need to warm up first. */
 const REMOTE_TIMEOUT_MS = 60_000;
 const LOCAL_TIMEOUT_MS = 180_000;
 const MAX_TOKENS = 4096;
-
-interface ModelEntry {
-  id: string;
-  name?: string;
-  display_name?: string;
-  displayName?: string;
-}
-
-interface GeminiModel {
-  name: string;
-  displayName: string;
-}
-
-interface LMStudioModel {
-  id: string;
-  type?: string;
-  arch?: string;
-  quantization?: string;
-  state?: string;
-  max_context_length?: number;
-}
-
-interface OllamaModel {
-  name: string;
-  model?: string;
-  details?: { parameter_size?: string; quantization_level?: string };
-}
 
 /**
  * Accepts anything the user is likely to paste ("localhost:1234",
@@ -166,160 +72,20 @@ export function normalizeBaseUrl(raw: string, provider: string): string {
 
 export class LLMService {
   public static async getProvider(): Promise<string> {
-    const saved = await LocalStorage.getItem<string>(STORAGE_KEYS.provider);
-    return saved || "raycast";
+    return getPreferenceValues<AISettings>().aiProvider || "raycast";
   }
 
-  public static async getApiKey(provider: string): Promise<string> {
-    return (
-      (await LocalStorage.getItem<string>(STORAGE_KEYS.apiKey(provider))) || ""
-    );
+  public static async getApiKey(): Promise<string> {
+    return getPreferenceValues<AISettings>().aiApiKey?.trim() || "";
   }
 
-  public static async getSelectedModel(provider?: string): Promise<string> {
-    const p = provider ?? (await this.getProvider());
-    return (await LocalStorage.getItem<string>(STORAGE_KEYS.model(p))) || "";
+  public static async getSelectedModel(): Promise<string> {
+    return getPreferenceValues<AISettings>().aiModel?.trim() || "";
   }
 
   public static async getBaseUrl(provider: string): Promise<string> {
-    const saved = await LocalStorage.getItem<string>(
-      STORAGE_KEYS.baseUrl(provider),
-    );
-    return normalizeBaseUrl(saved || "", provider);
-  }
-
-  // ---------------------------------------------------------------- models
-
-  public static async fetchModelsWithKey(
-    provider: string,
-    key: string,
-    baseUrl?: string,
-  ): Promise<Model[]> {
-    const base = normalizeBaseUrl(baseUrl || "", provider);
-
-    if (provider === "openai") {
-      const oai = await this.request(
-        "https://api.openai.com/v1/models",
-        "GET",
-        {
-          Authorization: `Bearer ${key}`,
-        },
-      );
-      return oai.data
-        .map((m: ModelEntry) => ({ id: m.id, name: m.id }))
-        .sort((a: Model, b: Model) => a.id.localeCompare(b.id));
-    }
-
-    if (provider === "anthropic") {
-      const ant = await this.request(
-        "https://api.anthropic.com/v1/models",
-        "GET",
-        {
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01",
-        },
-      );
-      return ant.data
-        .map((m: ModelEntry) => ({ id: m.id, name: m.display_name || m.id }))
-        .sort((a: Model, b: Model) => a.id.localeCompare(b.id));
-    }
-
-    if (provider === "gemini") {
-      const gem = await this.request(
-        "https://generativelanguage.googleapis.com/v1beta/models",
-        "GET",
-        { "x-goog-api-key": key },
-      );
-      return gem.models
-        .filter((m: GeminiModel) => m.name.includes("gemini"))
-        .map((m: GeminiModel) => ({
-          id: m.name.replace("models/", ""),
-          name: m.displayName,
-        }));
-    }
-
-    if (provider === "openrouter") {
-      const or = await this.request(
-        "https://openrouter.ai/api/v1/models",
-        "GET",
-        {},
-      );
-      return or.data.map((m: ModelEntry) => ({
-        id: m.id,
-        name: m.name || m.id,
-      }));
-    }
-
-    if (provider === "lmstudio") return this.fetchLMStudioModels(base, key);
-    if (provider === "ollama") return this.fetchOllamaModels(base, key);
-
-    return [];
-  }
-
-  /**
-   * Prefers LM Studio's native /api/v0/models, which reports model type and
-   * load state, and falls back to the OpenAI-compatible listing on older builds.
-   */
-  private static async fetchLMStudioModels(
-    base: string,
-    key: string,
-  ): Promise<Model[]> {
-    const headers = this.localHeaders(key);
-    try {
-      const res = await this.request(
-        `${base}/api/v0/models`,
-        "GET",
-        headers,
-        null,
-        LOCAL_TIMEOUT_MS,
-      );
-      const entries: LMStudioModel[] = res.data || [];
-      return entries
-        .filter((m) => m.type !== "embeddings")
-        .map((m) => ({
-          id: m.id,
-          name: m.state === "loaded" ? `${m.id} (loaded)` : m.id,
-          description:
-            [m.arch, m.quantization].filter(Boolean).join(" · ") || undefined,
-        }))
-        .sort((a, b) => a.id.localeCompare(b.id));
-    } catch {
-      const res = await this.request(
-        `${base}/v1/models`,
-        "GET",
-        headers,
-        null,
-        LOCAL_TIMEOUT_MS,
-      );
-      const entries: ModelEntry[] = res.data || [];
-      return entries
-        .map((m) => ({ id: m.id, name: m.id }))
-        .sort((a, b) => a.id.localeCompare(b.id));
-    }
-  }
-
-  private static async fetchOllamaModels(
-    base: string,
-    key: string,
-  ): Promise<Model[]> {
-    const res = await this.request(
-      `${base}/api/tags`,
-      "GET",
-      this.localHeaders(key),
-      null,
-      LOCAL_TIMEOUT_MS,
-    );
-    const entries: OllamaModel[] = res.models || [];
-    return entries
-      .map((m) => ({
-        id: m.model || m.name,
-        name: m.name,
-        description:
-          [m.details?.parameter_size, m.details?.quantization_level]
-            .filter(Boolean)
-            .join(" · ") || undefined,
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const configured = getPreferenceValues<AISettings>().aiBaseUrl || "";
+    return normalizeBaseUrl(configured, provider);
   }
 
   // ------------------------------------------------------------ completion
@@ -329,17 +95,17 @@ export class LLMService {
 
     if (provider === "raycast") return this.callRaycastAI(prompt);
 
-    const model = await this.getSelectedModel(provider);
-    const apiKey = await this.getApiKey(provider);
+    const model = await this.getSelectedModel();
+    const apiKey = await this.getApiKey();
 
     if (requiresApiKey(provider) && !apiKey) {
       throw new LLMConfigError(
-        `API key required for ${provider}. Set it in "Configure AI Model".`,
+        `API key required for ${provider}. Set it in the extension settings.`,
       );
     }
     if (!model) {
       throw new LLMConfigError(
-        `No model selected for ${provider}. Pick one in "Configure AI Model".`,
+        `No model selected for ${provider}. Set its exact model ID in the extension settings.`,
       );
     }
 
@@ -397,7 +163,7 @@ export class LLMService {
       const msg = (e as Error).message;
       if (msg.includes("Model is not supported")) {
         throw new LLMConfigError(
-          'Raycast AI is not available on this account. Pick another provider in "Configure AI Model".',
+          "Raycast AI is not available on this account. Pick another provider in the extension settings.",
         );
       }
       throw e;
