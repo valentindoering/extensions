@@ -90,15 +90,19 @@ Actions 6-9 ship with empty prompts and are meant for your own.
 Values saved through **Configure Actions** take precedence over the single-line
 preference fields.
 
-### 4. Selection Fallback on macOS
+### 4. Selected Text Method on macOS
 
-Stealth AI uses Raycast's native selected-text API by default. If that API does
-not work in an app, enable **Use clipboard fallback for selected text** in the
-extension settings. The fallback temporarily uses `Cmd + C`, reads the selected
-text, and restores the previous clipboard before sending the prompt.
+Choose **Selected Text Method** in the extension settings:
 
-The fallback is opt-in because it needs macOS Accessibility permission and
-temporarily touches the system clipboard.
+- **Raycast Only** uses Raycast's native selected-text API.
+- **Raycast, then Cmd+C** uses the native API first and the compatibility method
+  only when needed.
+- **Cmd+C, then Raycast** uses the compatibility method first and falls back to
+  the native API.
+
+The `Cmd+C` method temporarily copies the selection, reads it, and restores the
+previous clipboard before sending the prompt. It needs macOS Accessibility
+permission.
 
 ## 🛠️ Included Actions
 

@@ -4,7 +4,6 @@ import {
   environment,
   getFrontmostApplication,
   getPreferenceValues,
-  getSelectedText,
   launchCommand,
   LaunchType,
   showToast,
@@ -13,12 +12,16 @@ import {
 
 import { getActionConfig } from "./action-config";
 import { LLMConfigError, LLMService } from "./llm-service";
-import { activateApplication, getSelectedTextViaClipboard } from "./selection";
+import {
+  activateApplication,
+  getSelectedTextWithMethod,
+  SelectionMethod,
+} from "./selection";
 
 interface ActionPreferences {
   title?: string;
   prompt?: string;
-  useClipboardSelectionFallback?: boolean;
+  selectionMethod?: SelectionMethod;
 }
 
 // In-memory lock to prevent concurrent executions
@@ -101,26 +104,13 @@ async function runStealthActionInternal(actionId: string) {
   }
 
   // 3. Get selected text using Raycast's native cross-platform API
-  let selectedText = "";
-  let hasRealSelection = false;
-
-  try {
-    console.log("[DEBUG] Using Raycast getSelectedText API...");
-    selectedText = await getSelectedText();
-    hasRealSelection = selectedText.trim().length > 0;
-  } catch (e) {
-    console.log(`[DEBUG] getSelectedText failed (no selection): ${e}`);
-  }
-
-  if (!hasRealSelection && isMac && prefs.useClipboardSelectionFallback) {
-    try {
-      console.log("[DEBUG] Trying opt-in clipboard selection fallback...");
-      selectedText = await getSelectedTextViaClipboard(targetApplication);
-      hasRealSelection = selectedText.trim().length > 0;
-    } catch (error) {
-      console.log(`[DEBUG] Clipboard selection fallback failed: ${error}`);
-    }
-  }
+  const selectionMethod = prefs.selectionMethod ?? "raycast";
+  console.log(`[DEBUG] Selected-text method: ${selectionMethod}`);
+  const selectedText = await getSelectedTextWithMethod(
+    selectionMethod,
+    targetApplication,
+  );
+  const hasRealSelection = selectedText.trim().length > 0;
 
   if (!hasRealSelection || !selectedText || selectedText.trim().length === 0) {
     const toast = await showToast({

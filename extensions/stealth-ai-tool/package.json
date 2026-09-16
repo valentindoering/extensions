@@ -23,13 +23,26 @@
   "license": "MIT",
   "preferences": [
     {
-      "name": "useClipboardSelectionFallback",
-      "title": "Selection Fallback",
-      "description": "macOS only. If Raycast cannot read selected text, temporarily use Cmd+C and then restore the previous clipboard.",
-      "type": "checkbox",
-      "label": "Use clipboard fallback for selected text",
-      "default": false,
-      "required": false
+      "name": "selectionMethod",
+      "title": "Selected Text Method",
+      "description": "Choose how Stealth AI reads selected text before replacing it. Cmd+C modes require macOS Accessibility permission.",
+      "type": "dropdown",
+      "data": [
+        {
+          "title": "Raycast Only",
+          "value": "raycast"
+        },
+        {
+          "title": "Raycast, then Cmd+C",
+          "value": "fallback"
+        },
+        {
+          "title": "Cmd+C, then Raycast",
+          "value": "clipboard"
+        }
+      ],
+      "default": "raycast",
+      "required": true
     }
   ],
   "commands": [

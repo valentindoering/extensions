@@ -1,5 +1,7 @@
-import { Application, Clipboard } from "@raycast/api";
+import { Application, Clipboard, getSelectedText } from "@raycast/api";
 import { execFileSync } from "child_process";
+
+export type SelectionMethod = "raycast" | "fallback" | "clipboard";
 
 const ACTIVATE_AND_COPY_SCRIPT = `
 on run argv
@@ -66,6 +68,44 @@ export async function getSelectedTextViaClipboard(
   } finally {
     await restoreClipboard(previousClipboard);
   }
+}
+
+async function getSelectedTextViaRaycast(): Promise<string> {
+  try {
+    return await getSelectedText();
+  } catch (error) {
+    console.log(`[DEBUG] Raycast selected-text API failed: ${error}`);
+    return "";
+  }
+}
+
+async function getSelectedTextViaClipboardSafely(
+  targetApplication?: Application,
+): Promise<string> {
+  if (process.platform !== "darwin") return "";
+
+  try {
+    return await getSelectedTextViaClipboard(targetApplication);
+  } catch (error) {
+    console.log(`[DEBUG] Cmd+C selected-text method failed: ${error}`);
+    return "";
+  }
+}
+
+export async function getSelectedTextWithMethod(
+  method: SelectionMethod,
+  targetApplication?: Application,
+): Promise<string> {
+  if (method === "raycast") return getSelectedTextViaRaycast();
+
+  if (method === "clipboard") {
+    const copiedText =
+      await getSelectedTextViaClipboardSafely(targetApplication);
+    return copiedText || getSelectedTextViaRaycast();
+  }
+
+  const selectedText = await getSelectedTextViaRaycast();
+  return selectedText || getSelectedTextViaClipboardSafely(targetApplication);
 }
 
 export async function activateApplication(
