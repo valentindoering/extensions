@@ -1,0 +1,18 @@
+version = 1
+name = "raycast-extensions"
+
+[setup]
+script = '''
+set -euo pipefail
+bash .codex/setup.sh
+'''
+
+[[actions]]
+name = "Check Deepcast"
+icon = "test"
+command = "cd extensions/deepcast && npm test && npm run build"
+
+[[actions]]
+name = "Build Stealth AI"
+icon = "test"
+command = "cd extensions/stealth-ai-tool && npm run build"
